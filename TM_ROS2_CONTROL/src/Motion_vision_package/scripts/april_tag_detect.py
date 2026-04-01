@@ -192,7 +192,10 @@ def main():
 
         print("4x4 Transformation Matrix:\n", pose)
         print("InitError:", init_error, "FinalError:", final_error)
-
+        #  如果是 ID=4，就額外保存
+        if det.tag_id == 4:
+            saved_pose_id4 = pose.copy()
+            print(">>> 已保存 Tag ID 4 的 pose")
         # 存起來給 matplotlib 用
         tag_poses.append((det.tag_id, pose))
 
