@@ -1,0 +1,192 @@
+
+# 開ros相機 ，camera_extrinsic_parameters.launch.py 後參數可直接修改相機外參
+REDIST=$HOME/LIPSedge-Camera-SDK-Linux-1.01/LIPSedge-AE430_AE470-SDK-Linux-amd64-2.4.4.2_v1.3.3/Redist
+source ~/LIPSedge_ws/install/setup.bash
+export OPENNI2_REDIST=$REDIST
+export OPENNI2_DRIVERS=$REDIST/OpenNI2/Drivers
+export LD_LIBRARY_PATH=$OPENNI2_REDIST:$LD_LIBRARY_PATH
+#  ros2 launch openni2_camera camera_extrinsic_parameters.launch.py tx:=0.8 tz:=0.9 qx:=0.7071 qy:=-0.7071 qz:=0.0 qw:=0.0
+
+# 開相機
+cd ~/Isaac_Sim_Robot/ && source venv310_nocuda/bin/activate
+python3 Workers/openni_to_ros2.py --tx 0.4 --ty 0.05 --tz 1.05 --qx 0.7071 --qy -0.7071 --qz 0.0 --qw 0.0
+
+python3 Workers/openni_to_ros2.py --tx 0.508510 --ty -0.007868 --tz 0.908484 --qx 0.723062 --qy -0.685962 --qz 0.054647 --qw -0.060426
+python3 Workers/openni_to_ros2.py --tx 0.510145 --ty -0.017050 --tz 0.908461 --qx 0.723484 --qy -0.685839 --qz 0.050159 --qw -0.060661
+python3 Workers/openni_to_ros2.py --tx 0.504833 --ty -0.011082 --tz 0.908677 --qx 0.723707 --qy -0.685238 --qz 0.054941 --qw -0.060653
+python3 Workers/openni_to_ros2.py --tx 0.503166 --ty -0.009340 --tz 0.907985 --qx 0.723643 --qy -0.685184 --qz 0.056203 --qw -0.060878
+
+
+# ========================================
+# 打開新Terminal 進docker 開nvblox
+docker start -i pose_nvblox_laptop
+
+
+ros2 run nvblox_ros nvblox_node --ros-args     -p use_tf_transforms:=true     -p global_frame:=odom     -p voxel_size:=0.05     -r camera_0/depth/image:=/camera/depth/image_raw     -r camera_0/depth/camera_info:=/camera/depth/camera_info     -r camera_0/color/image:=/camera/rgb/image_raw     -r camera_0/color/camera_info:=/camera/rgb/camera_info -p layer_streamer_bandwidth_limit_mbps:=150.0 -p publish_layer_rate_hz:=5.0 \
+  -p static_mapper.projective_tsdf_integrator_invalid_depth_decay_factor:=0.85 \
+  -p static_mapper.tsdf_decay_factor:=0.5
+
+# ========================================
+# 打開新Terminal 開pose開base_link 
+ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 0 odom base_link
+
+# ========================================
+# 打開新Terminal 進docker 開pose
+docker exec -i -t -u admin pose_nvblox_laptop /bin/bash
+
+ros2 launch isaac_ros_foundationpose isaac_ros_foundationpose_lips.launch.py   use_tracking:=True reset_period_ms:=300  rgb_topic:=/color/image_raw     depth_topic:=/depth/image_rect_32FC1     camera_info:=/color/camera_info     mask_topic:=/segmentation     mesh_file:=/workspaces/isaac_ros-dev/Misin/quit.obj     tex_file:=/workspaces/isaac_ros-dev/Misin/misin_0729_2.png
+
+
+# ========================================
+# 打開新Terminal
+# 允許 X11（每個新 terminal 可再跑一次）
+xhost +local:root
+
+# 打開Docker
+docker start -ai tm_stack
+
+# 打開新Terminal 運作driver
+docker exec -it tm_stack bash -lc '
+  source /opt/ros/humble/setup.bash;
+  source /ws/install/setup.bash;
+  ros2 run tm_driver tm_driver -- robot_ip:=192.168.1.222
+'
+
+
+# ========================================
+# 打開新Terminal 開啟Robot Tool
+export FASTRTPS_DEFAULT_PROFILES_FILE=$HOME/.config/fastdds_no_shm.xml
+export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+export ROS_DOMAIN_ID=0
+source /opt/ros/humble/setup.bash
+source /ws/install/setup.bash
+
+# 先確認TM是否執行正確執行劇本
+# 測試指令
+ros2 service call /set_positions tm_msgs/srv/SetPositions '{motion_type: 1,
+  positions: [0.0, -1.0, 1.5, 0.0, 1.5, 0.5],
+  velocity: 60.2,
+  acc_time: 1.2,
+  blend_percentage: 0,
+  fine_goal: true}'
+  
+ros2 service call /set_positions tm_msgs/srv/SetPositions '{motion_type: 1,
+  positions: [0.0, -1.0, 1.5, 0.0, 1.5, -0.5],
+  velocity: 60.2,
+  acc_time: 1.2,
+  blend_percentage: 0,
+  fine_goal: true}'
+
+# 開啟Robot Tool
+cd ~/Isaac_Sim_Robot/ && source venv310_nocuda/bin/activate
+python3 tm_main.py
+
+
+# ========================================
+# 開isaac sim?
+~/isaac-sim-standalone/isaac-sim.sh
+
+(isaac sim 開啟之後打開劇本 [Isaac Examples]>[Manipulation]>[LIPS Follow Target(TM)])
+(按下「LOAD」讀取數位資產時可能需要連網,讀取完後按下「START」叫出麥香 完成設置)
+
+
+
+
+
+
+
+
+
+
+
+# ====== 以下為筆記，非流程 ======
+
+ \
+  -p static_mapper.projective_tsdf_integrator_invalid_depth_decay_factor:=0.85 \
+  -p static_mapper.tsdf_decay_factor:=0.5
+
+
+
+
+ros2 run nvblox_ros nvblox_node --ros-args \
+  -p use_tf_transforms:=true \
+  -p global_frame:=odom \
+  -p voxel_size:=0.05 \
+  -r camera_0/depth/image:=/camera/depth/image_raw \
+  -r camera_0/depth/camera_info:=/camera/depth/camera_info \
+  -r camera_0/color/image:=/camera/rgb/image_raw \
+  -r camera_0/color/camera_info:=/camera/rgb/camera_info \
+  -p integrate_depth_rate_hz:=5.0 \
+  -p update_esdf_rate_hz:=5.0 \
+  -p update_mesh_rate_hz:=5.0 \
+  -p publish_layer_rate_hz:=15.0 \
+  -p mapping_type:=static_tsdf \
+  -p decay_tsdf_rate_hz:=5.0 \
+  -p static_mapper.projective_tsdf_integrator_invalid_depth_decay_factor:=0.85 \
+  -p static_mapper.tsdf_decay_factor:=0.5 \
+  -p static_mapper.decay_integrator_deallocate_decayed_blocks:=false \
+  -p static_mapper.tsdf_set_free_distance_on_decayed:=true \
+  -p static_mapper.tsdf_decayed_weight_threshold:=0.01
+
+
+
+
+
+
+
+
+
+# 打開新Terminal
+# 允許 X11（每個新 terminal 可再跑一次）
+xhost +local:root
+
+# 打開Docker（host 網路 + 正確掛載 tm_ws）
+docker start -ai tm_stack
+
+# docker run -it --name tm_stack --network host \
+  -v ~/tm_stack/ws:/ws \
+  -v ~/tm_stack/ws_legacy:/ws_legacy \
+  tm5_humble:latest bash
+  
+# 設置與啟動
+source /opt/ros/humble/setup.bash
+source /ws/install/setup.bash
+ros2 run tm_driver tm_driver -- robot_ip:=192.168.1.222
+
+# =========== 檢查 =============
+# 打開新Terminal
+docker exec -it tm_stack bash -lc 'source /opt/ros/humble/setup.bash; source /ws/install/setup.bash; ros2 topic list'
+
+# 若有/joint_states、/feedback_states 則順利連線
+
+# 打開新Terminal
+# 進入docker
+docker exec -it tm_stack bash
+
+
+
+# docker exec -it tm_stack bash -lc '
+  source /opt/ros/humble/setup.bash;
+  source /ws/install/setup.bash;
+  # 用 -- 分隔，後面給可執行檔自己的參數
+  ros2 run tm_driver tm_driver -- robot_ip:=192.168.1.222
+'
+
+# 打開新Terminal 免進入docker
+source /opt/ros/humble/setup.bash
+
+# 測試查看是否連線robot
+ros2 interface show tm_msgs/srv/SetPositions
+# 下命令
+ros2 service call /set_positions tm_msgs/srv/SetPositions '{motion_type: 1,
+  positions: [0.9, -1.1, 1.1, 0.0, 0.1, 0.0],
+  velocity: 60.2,
+  acc_time: 1.2,
+  blend_percentage: 0,
+  fine_goal: true}'
+  
+  
+  
+
+nsys profile   --trace=cuda,cudnn,nvtx,osrt   --sample=cpu   --output=/workspaces/isaac_ros-dev/fp_profile_report   --stop-on-exit=true 
+
