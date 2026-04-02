@@ -27,6 +27,14 @@ install(PROGRAMS
   scripts/robot_move.py
   DESTINATION lib/${PROJECT_NAME}
 )
+install(PROGRAMS
+  scripts/lips_camera_calibration_hand_eye.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+install(PROGRAMS
+  scripts/Send_simple_msg.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 
 ament_package()
