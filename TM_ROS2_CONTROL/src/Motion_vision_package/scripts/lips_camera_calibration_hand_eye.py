@@ -36,7 +36,8 @@ class CameraSaveOnOkNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-
+    global image_count
+    image_count = 0
     node = None
     device = None
     color = None
@@ -76,9 +77,10 @@ def main(args=None):
             cv2.imshow('Depth', depth_mat)
 
             if node.consume_save_request():
-                rgb_path = os.path.join(node.save_dir, 'rgb_image.png')
+                rgb_path = os.path.join(node.save_dir, f'{image_count}.png')
                 cv2.imwrite(rgb_path, rgb_mat)
                 node.get_logger().info(f'Saved RGB image: {rgb_path}')
+                image_count += 1
 
             key = cv2.waitKey(1)
             if key == ord('q'):
